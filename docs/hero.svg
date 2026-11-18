@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 560" width="1280" height="560" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">
+<rect width="1280" height="560" rx="14" fill="#0d1117"/>
+<rect x="24" y="24" width="600" height="512" rx="10" fill="#161b22" stroke="#30363d"/>
+<circle cx="46" cy="44" r="6" fill="#ff5f57"/>
+<circle cx="66" cy="44" r="6" fill="#febc2e"/>
+<circle cx="86" cy="44" r="6" fill="#28c840"/>
+<text x="324.0" y="49" font-size="13" fill="#8b949e" text-anchor="middle">orders.go</text>
+<line x1="24" y1="64" x2="624" y2="64" stroke="#30363d"/>
+<text x="44" y="92" font-size="15" xml:space="preserve"><tspan fill="#8b949e">// The route lives on the request type.</tspan></text>
+<text x="44" y="117" font-size="15" xml:space="preserve"><tspan fill="#ff7b72">type </tspan><tspan fill="#79c0ff">GetOrder </tspan><tspan fill="#ff7b72">struct </tspan><tspan fill="#e6edf3">{</tspan></text>
+<text x="44" y="142" font-size="15" xml:space="preserve"><tspan fill="#79c0ff">    mapget.Route </tspan><tspan fill="#a5d6ff">`route:&quot;GET /orders/{id}&quot;`</tspan></text>
+<text x="44" y="167" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">    ID     </tspan><tspan fill="#79c0ff">int      </tspan><tspan fill="#a5d6ff">`path:&quot;id&quot;`</tspan></text>
+<text x="44" y="192" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">    Expand </tspan><tspan fill="#79c0ff">[]string </tspan><tspan fill="#a5d6ff">`query:&quot;expand&quot;`</tspan></text>
+<text x="44" y="217" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">    Limit  </tspan><tspan fill="#79c0ff">int      </tspan><tspan fill="#a5d6ff">`query:&quot;limit&quot; default:&quot;20&quot;`</tspan></text>
+<text x="44" y="242" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">}</tspan></text>
+<text x="44" y="292" font-size="15" xml:space="preserve"><tspan fill="#ff7b72">func </tspan><tspan fill="#e6edf3">(s *Service) </tspan><tspan fill="#d2a8ff">GetOrder</tspan><tspan fill="#e6edf3">(ctx context.Context,</tspan></text>
+<text x="44" y="317" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">    in </tspan><tspan fill="#79c0ff">GetOrder</tspan><tspan fill="#e6edf3">) (</tspan><tspan fill="#79c0ff">Order</tspan><tspan fill="#e6edf3">, </tspan><tspan fill="#79c0ff">error</tspan><tspan fill="#e6edf3">) {</tspan></text>
+<text x="44" y="342" font-size="15" xml:space="preserve"><tspan fill="#8b949e">    ...</tspan></text>
+<text x="44" y="367" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">}</tspan></text>
+<text x="44" y="417" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">mux := http.</tspan><tspan fill="#d2a8ff">NewServeMux</tspan><tspan fill="#e6edf3">()</tspan><tspan fill="#8b949e">     // still the std mux</tspan></text>
+<text x="44" y="442" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">app := mapget.</tspan><tspan fill="#d2a8ff">New</tspan><tspan fill="#e6edf3">(mux)</tspan></text>
+<text x="44" y="467" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">mapget.</tspan><tspan fill="#d2a8ff">Handle</tspan><tspan fill="#e6edf3">(app, svc.GetOrder)</tspan></text>
+<text x="44" y="517" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">app.</tspan><tspan fill="#d2a8ff">Path</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#79c0ff">GetOrder</tspan><tspan fill="#e6edf3">{ID: </tspan><tspan fill="#79c0ff">42</tspan><tspan fill="#e6edf3">})</tspan><tspan fill="#8b949e">   // &quot;/orders/42&quot;</tspan></text>
+<rect x="648" y="24" width="608" height="512" rx="10" fill="#161b22" stroke="#30363d"/>
+<circle cx="670" cy="44" r="6" fill="#ff5f57"/>
+<circle cx="690" cy="44" r="6" fill="#febc2e"/>
+<circle cx="710" cy="44" r="6" fill="#28c840"/>
+<text x="952.0" y="49" font-size="13" fill="#8b949e" text-anchor="middle">curl</text>
+<line x1="648" y1="64" x2="1256" y2="64" stroke="#30363d"/>
+<text x="668" y="92" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">$ curl /orders/42?expand=lines</tspan></text>
+<text x="668" y="116" font-size="15" xml:space="preserve"><tspan fill="#3fb950">200</tspan><tspan fill="#e6edf3"> {&quot;id&quot;:42,&quot;lines&quot;:[...]}</tspan></text>
+<text x="668" y="164" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">$ curl /orders/abc</tspan></text>
+<text x="668" y="188" font-size="15" xml:space="preserve"><tspan fill="#d29922">404</tspan><tspan fill="#e6edf3"> {&quot;status&quot;:404,&quot;title&quot;:&quot;Not Found&quot;}</tspan></text>
+<text x="668" y="212" font-size="15" xml:space="preserve"><tspan fill="#8b949e">    ID is an int, so abc is not an address</tspan></text>
+<text x="668" y="260" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">$ curl /orders/42?limit=ten</tspan></text>
+<text x="668" y="284" font-size="15" xml:space="preserve"><tspan fill="#f85149">400</tspan><tspan fill="#e6edf3"> {&quot;errors&quot;:{&quot;limit&quot;:[&quot;must be an</tspan></text>
+<text x="668" y="308" font-size="15" xml:space="preserve"><tspan fill="#f85149"></tspan><tspan fill="#8b949e">      integer&quot;]},&quot;status&quot;:400,&quot;title&quot;:</tspan></text>
+<text x="668" y="332" font-size="15" xml:space="preserve"><tspan fill="#f85149"></tspan><tspan fill="#8b949e">      &quot;One or more validation errors</tspan></text>
+<text x="668" y="356" font-size="15" xml:space="preserve"><tspan fill="#f85149"></tspan><tspan fill="#8b949e">      occurred.&quot;}</tspan></text>
+<text x="668" y="404" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">$ curl -X DELETE /orders/42</tspan></text>
+<text x="668" y="428" font-size="15" xml:space="preserve"><tspan fill="#d29922">405</tspan><tspan fill="#e6edf3"> Allow: GET, HEAD</tspan></text>
+<text x="668" y="476" font-size="15" xml:space="preserve"><tspan fill="#e6edf3">$ curl /openapi.json</tspan></text>
+<text x="668" y="500" font-size="15" xml:space="preserve"><tspan fill="#3fb950">200</tspan><tspan fill="#e6edf3"> {&quot;openapi&quot;:&quot;3.1.0&quot;,&quot;paths&quot;:{...}}</tspan></text>
+</svg>

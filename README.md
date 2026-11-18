@@ -1,6 +1,16 @@
 # mapget
 
+[![ci](https://github.com/AndyCross/mapget/actions/workflows/ci.yml/badge.svg)](https://github.com/AndyCross/mapget/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/AndyCross/mapget.svg)](https://pkg.go.dev/github.com/AndyCross/mapget)
+[![Go Report Card](https://goreportcard.com/badge/github.com/AndyCross/mapget)](https://goreportcard.com/report/github.com/AndyCross/mapget)
+[![Release](https://img.shields.io/github/v/tag/AndyCross/mapget?label=release&sort=semver)](https://github.com/AndyCross/mapget/releases)
+![Dependencies: 0](https://img.shields.io/badge/dependencies-0-brightgreen)
+![Fuzzed in CI](https://img.shields.io/badge/fuzzed-in%20CI-blueviolet)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
+
 Typed, self-describing endpoints on Go's standard `http.ServeMux`, for people who came from ASP.NET Core.
+
+![A request type that carries its route, and the answers it gives](docs/hero.svg)
 
 Go 1.22 gave the standard mux methods and wildcards (`"GET /orders/{id}"`), which covers matching a request to a handler. ASP.NET Core does a good deal around its router that the mux leaves to you: route constraints, model binding, validation problem responses, link generation, route groups, a list of endpoints and an OpenAPI document. mapget is those parts, and nothing else. The mux still does all the routing, and the package has no dependencies outside the standard library.
 
@@ -9,6 +19,70 @@ go get github.com/AndyCross/mapget
 ```
 
 Go 1.23 or later. The patterns arrived in 1.22, but on 1.22 `Request.PathValue` panics when a `{rest...}` wildcard's value is exactly `*`, which this package's fuzz test found, and 1.23 fixed it.
+
+## Try it in a minute
+
+```
+git clone https://github.com/AndyCross/mapget && cd mapget
+go run ./example
+```
+
+Then open http://localhost:8080/docs. Nothing in the example describes its API by hand: the page below is Swagger UI reading the document mapget generated from the Go types and their tags.
+
+![Swagger UI showing the example's orders API](docs/swagger.png)
+
+## Before and after
+
+One endpoint: an integer id in the path, a `page` that defaults to 1, a search term.
+
+<table>
+<tr><th>net/http alone</th><th>with mapget</th></tr>
+<tr><td>
+
+```go
+func getOrder(w http.ResponseWriter, r *http.Request) {
+    id, err := strconv.Atoi(r.PathValue("id"))
+    if err != nil {
+        http.NotFound(w, r)
+        return
+    }
+    q := r.URL.Query()
+    page := 1
+    if s := q.Get("page"); s != "" {
+        if page, err = strconv.Atoi(s); err != nil {
+            http.Error(w, "page must be an integer",
+                http.StatusBadRequest)
+            return
+        }
+    }
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(find(id, page, q.Get("q")))
+}
+
+mux.HandleFunc("GET /orders/{id}", getOrder)
+```
+
+</td><td>
+
+```go
+type GetOrder struct {
+    mapget.Route `route:"GET /orders/{id}"`
+    ID   int    `path:"id"`
+    Page int    `query:"page" default:"1"`
+    Q    string `query:"q"`
+}
+
+func getOrder(ctx context.Context, in GetOrder) (Order, error) {
+    return find(in.ID, in.Page, in.Q), nil
+}
+
+mapget.Handle(app, getOrder)
+```
+
+</td></tr>
+</table>
+
+The right-hand side also answers a bad `page` with problem details JSON, appears in the route table and the OpenAPI document, and can be linked to with `app.Path(GetOrder{ID: 42})`. It costs 46 ns a request more than the left (see [What it costs](#what-it-costs)).
 
 ## The route goes on the request type
 
@@ -219,6 +293,18 @@ curl -s localhost:8080/api/orders/1
 curl -s 'localhost:8080/api/orders?limit=abc'
 curl -s --json '{"customer":"Ada","lines":[{"sku":"TILE-4","qty":12}]}' localhost:8080/api/orders
 curl -s localhost:8080/openapi.json
+```
+
+Swagger UI is at http://localhost:8080/docs. The example loads it from a CDN; the library itself serves only the JSON document.
+
+## Tests
+
+87% of statements are covered. `FuzzPathRoundTrip` checks that link generation and binding are inverses through a real `ServeMux`, and runs in CI on Go 1.23 and the current release.
+
+```
+go test ./...
+go test -run '^$' -fuzz FuzzPathRoundTrip -fuzztime 30s .
+go test -run '^$' -bench . .
 ```
 
 ## Licence

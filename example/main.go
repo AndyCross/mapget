@@ -7,10 +7,14 @@
 //	curl -s localhost:8080/api/orders/abc
 //	curl -s -X POST localhost:8080/api/orders -d '{"customer":"Ada","lines":[{"sku":"TILE-4","qty":12}]}'
 //	curl -s localhost:8080/openapi.json
+//
+// Then open http://localhost:8080/docs for Swagger UI over the generated
+// document.
 package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -150,6 +154,24 @@ func logging(next http.Handler) http.Handler {
 	})
 }
 
+// swaggerUI serves Swagger UI from a CDN, pointed at the generated document.
+func swaggerUI(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	io.WriteString(w, `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orders API</title>
+<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css">
+</head>
+<body>
+<div id="ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({url: "/openapi.json", dom_id: "#ui", docExpansion: "list"})</script>
+</body>
+</html>`)
+}
+
 func main() {
 	mux := http.NewServeMux()
 	app := mapget.New(mux)
@@ -163,9 +185,11 @@ func main() {
 
 	s.create(context.Background(), CreateOrder{Body: NewOrder{Customer: "Grace", Lines: []Line{{SKU: "TILE-9", Qty: 40}}}})
 
-	app.Handle("GET /openapi.json", app.OpenAPI(mapget.Info{Title: "Orders", Version: "1.0.0"}))
+	app.Handle("GET /openapi.json", app.OpenAPI(mapget.Info{Title: "Orders", Version: "1.0.0",
+		Description: "The mapget example. Every operation here was generated from Go types and struct tags."}))
+	app.HandleFunc("GET /docs", swaggerUI)
 	app.WriteRoutes(os.Stdout)
 
-	log.Println("listening on :8080")
+	log.Println("listening on :8080, docs at http://localhost:8080/docs")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }

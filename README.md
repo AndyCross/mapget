@@ -162,6 +162,40 @@ Every failing query, header and cookie value is reported in one answer, in the s
 
 A body with a content type other than JSON is answered with 415, one over the limit (1 MiB unless `mapget.MaxBody` says otherwise) with 413, and malformed JSON with 400.
 
+## Constraints
+
+The field's type is the constraint, so `int`, `time.Time` and `netip.Addr` fields need nothing more. For something narrower, such as ASP.NET Core's `{sku:regex(^[A-Z]{{2,6}}-[0-9]{{4}}$)}`, write a type whose `UnmarshalText` rejects everything else:
+
+```go
+type SKU string
+
+var skuPattern = regexp.MustCompile(`^[A-Z]{2,6}-[0-9]{4}$`)
+
+func (s *SKU) UnmarshalText(text []byte) error {
+    if !skuPattern.Match(text) {
+        return errors.New("not a SKU")
+    }
+    *s = SKU(text)
+    return nil
+}
+
+type GetProduct struct {
+    mapget.Route `route:"GET /products/{sku}"`
+    SKU  SKU  `path:"sku"`
+    Like *SKU `query:"like"`
+}
+```
+
+| Request | Answer |
+|---|---|
+| `GET /products/TILE-0042` | 200, the handler runs with `in.SKU == "TILE-0042"` |
+| `GET /products/tile-42` | 404, as a failed route constraint is in ASP.NET Core |
+| `GET /products/TILE-0042?like=nope` | 400, `{"errors":{"like":["must be a valid SKU"]}, ...}` |
+
+The rule is written once, on the type, and applies wherever a `SKU` is read: path, query string, header or cookie. `encoding/json` calls the same method, so a `SKU` in a JSON body is held to it too. The handler never sees a value that failed. This is a runnable example in the package (`Example_regexConstraint`).
+
+One difference from ASP.NET Core: there, two routes can share a path and be told apart by constraint (`{id:int}` beside `{slug}`). The mux matches before any constraint runs, so here one pattern owns `/products/{x}`, and a field that needs to accept both shapes is a type that parses both.
+
 ## Mistakes stop the program at startup
 
 `r.PathValue("idd")` on a pattern with `{id}` compiles, runs and returns an empty string. With mapget the pattern and the fields are checked against each other when the route is registered, and a mismatch panics, in the way the mux itself panics on a conflicting pattern:
@@ -276,7 +310,8 @@ The tags are read once, at registration. A request costs a few `reflect` field s
 ## What it does not do
 
 - Route. The mux does that, so precedence, conflicts, `405`, host patterns and trailing-slash redirects are exactly the standard library's.
-- Regular expression constraints. The field's type is the constraint. For anything narrower, implement `encoding.TextUnmarshaler` on a type of your own and have it reject what it should.
+- Constraint syntax in the pattern, such as `{id:int}` or `{sku:regex(...)}`. The mux has none. Constraints work, and are written as types: see [Constraints](#constraints).
+- Wildcards inside a segment, such as `report-{year}.{ext}`. The mux matches whole segments only.
 - Dependency injection. Handlers are methods on a struct that holds what they need.
 - Form and multipart bodies, content negotiation, XML. Take a `*http.Request` field, or register a plain handler beside the typed ones.
 - Authentication. That is middleware.

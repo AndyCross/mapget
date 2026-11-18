@@ -57,9 +57,25 @@
 //
 // # Validation
 //
-// If the request type has a Validate() error method, it runs after binding.
-// Return FieldErrors for a 400 with messages by field, a *Problem for any
-// other answer, or a plain error for a 400 with its text.
+// Rules go in tags named after the JSON Schema keywords, on parameter fields
+// and on any field inside a JSON body:
+//
+//	minimum, maximum      numbers
+//	minLength, maxLength  strings, counted in characters
+//	pattern               strings, a regular expression
+//	enum                  strings and integers, comma separated
+//	minItems, maxItems    slices; the tags above apply to each element
+//
+// Every failure is reported in one 400, under the field's name or its path
+// in the body, such as "lines[0].qty". On a path field a rule is a route
+// constraint and a value outside it is a 404. An absent optional parameter,
+// a nil pointer and an omitempty body field at its zero value are not
+// checked. The same tags are written into the OpenAPI document.
+//
+// For a rule a tag cannot state, give the request type a Validate() error
+// method. It runs after binding, once the tags have passed. Return
+// FieldErrors for a 400 with messages by field, a *Problem for any other
+// answer, or a plain error for a 400 with its text.
 //
 // # Results and errors
 //

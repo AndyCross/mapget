@@ -83,8 +83,13 @@ func (r *Router) OpenAPI(info Info) Document {
 					if f.hasDef {
 						schema["default"] = defaultValue(f)
 					}
+					var array map[string]any
 					if f.slice {
-						schema = map[string]any{"type": "array", "items": schema}
+						array = map[string]any{"type": "array", "items": schema}
+					}
+					f.rules.describe(schema, array)
+					if f.slice {
+						schema = array
 					}
 					param := map[string]any{"name": f.name, "in": f.src.String(), "schema": schema}
 					if f.src == fromPath || f.required {
@@ -298,6 +303,17 @@ func (g *schemaGen) fields(t reflect.Type, props map[string]any, required *[]str
 			name = sf.Name
 		}
 		schema := g.of(sf.Type)
+		if scalar, slice := fieldShape(sf.Type); true {
+			// A tag that does not suit the type was refused at registration
+			// if it is in a request, and is left out here if it is not.
+			if r, err := parseRules(sf.Tag, scalar, slice); err == nil && r != nil {
+				if items, ok := schema["items"].(map[string]any); slice && ok {
+					r.describe(items, schema)
+				} else if !slice {
+					r.describe(schema, nil)
+				}
+			}
+		}
 		if doc := sf.Tag.Get("doc"); doc != "" {
 			schema["description"] = doc
 		}

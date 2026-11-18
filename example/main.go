@@ -26,8 +26,8 @@ import (
 )
 
 type Line struct {
-	SKU string `json:"sku"`
-	Qty int    `json:"qty" doc:"How many, at least one."`
+	SKU string `json:"sku" pattern:"^[A-Z]{2,6}-[0-9]+$"`
+	Qty int    `json:"qty" minimum:"1" doc:"How many."`
 }
 
 type Order struct {
@@ -44,8 +44,8 @@ type Order struct {
 
 type ListOrders struct {
 	mapget.Route `route:"GET /orders" summary:"List orders" tags:"orders"`
-	Status       string `query:"status" doc:"Only orders in this state."`
-	Limit        int    `query:"limit" default:"20"`
+	Status       string `query:"status" enum:"open,shipped" doc:"Only orders in this state."`
+	Limit        int    `query:"limit" default:"20" minimum:"1" maximum:"100"`
 }
 
 type GetOrder struct {
@@ -59,26 +59,19 @@ type CreateOrder struct {
 }
 
 type NewOrder struct {
-	Customer string `json:"customer"`
-	Lines    []Line `json:"lines"`
+	Customer string `json:"customer" minLength:"1" maxLength:"80"`
+	Lines    []Line `json:"lines" minItems:"1" maxItems:"50"`
 }
 
+// Validate is for rules a tag cannot state, such as one that compares two
+// values. The tags have already been checked when it runs.
 func (c CreateOrder) Validate() error {
-	errs := mapget.FieldErrors{}
-	if c.Body.Customer == "" {
-		errs.Add("customer", "is required")
-	}
-	if len(c.Body.Lines) == 0 {
-		errs.Add("lines", "must have at least one line")
-	}
+	seen := map[string]bool{}
 	for _, l := range c.Body.Lines {
-		if l.Qty < 1 {
-			errs.Add("lines", "qty must be at least 1")
-			break
+		if seen[l.SKU] {
+			return mapget.FieldErrors{"lines": {"has " + l.SKU + " twice; put the quantities on one line"}}
 		}
-	}
-	if len(errs) > 0 {
-		return errs
+		seen[l.SKU] = true
 	}
 	return nil
 }

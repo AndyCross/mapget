@@ -234,22 +234,71 @@ This is `MapGroup`. Middleware is the usual `func(http.Handler) http.Handler`. A
 
 ## Validation
 
-If the request type has a `Validate() error` method it runs after binding:
+Rules go in tags, beside the tag that says where the value comes from. The names are the JSON Schema keywords, so the same tags appear in the OpenAPI document. This is the job DataAnnotations do in ASP.NET Core (`[Range]`, `[StringLength]`, `[RegularExpression]`).
+
+```go
+type ListOrders struct {
+    mapget.Route `route:"GET /orders"`
+    Status string `query:"status" enum:"open,shipped"`
+    Limit  int    `query:"limit" default:"20" minimum:"1" maximum:"100"`
+}
+
+type CreateOrder struct {
+    mapget.Route `route:"POST /orders"`
+    Body NewOrder `body:"json"`
+}
+
+type NewOrder struct {
+    Customer string `json:"customer" minLength:"1" maxLength:"80"`
+    Lines    []Line `json:"lines" minItems:"1" maxItems:"50"`
+}
+
+type Line struct {
+    SKU string `json:"sku" pattern:"^[A-Z]{2,6}-[0-9]+$"`
+    Qty int    `json:"qty" minimum:"1"`
+}
+```
+
+| Tag | Applies to |
+|---|---|
+| `minimum`, `maximum` | numbers |
+| `minLength`, `maxLength` | strings, counted in characters |
+| `pattern` | strings, a regular expression |
+| `enum` | strings and integers, comma separated |
+| `minItems`, `maxItems` | slices. The tags above, on a slice field, apply to each element |
+
+They work on `query`, `header`, `cookie` and `path` fields and on every field inside a JSON body, however deep. Every failure is reported at once, under the field's name or its path in the body:
+
+```
+$ curl -s --json '{"customer":"","lines":[{"sku":"tile","qty":0}]}' localhost:8080/api/orders
+{
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "customer": ["must be at least 1 character"],
+    "lines[0].qty": ["must be at least 1"],
+    "lines[0].sku": ["must match the pattern ^[A-Z]{2,6}-[0-9]+$"]
+  }
+}
+```
+
+- On a `path` field a rule is a route constraint, so a value outside it is a 404: `ID int` tagged `path:"id" minimum:"1"` is ASP.NET Core's `{id:int:min(1)}`.
+- An optional parameter that is absent is not checked. Neither is a nil pointer, or a body field marked `omitempty` that holds its zero value.
+- A tag that does not suit its field (`minimum` on a string, a pattern that does not compile, a default that breaks its own rule) panics at registration.
+- A type with no rule tags costs nothing extra per request.
+
+For a rule a tag cannot state, such as one that compares two fields, give the request type a `Validate() error` method. It runs after binding and after the tags have passed:
 
 ```go
 func (c CreateOrder) Validate() error {
-    errs := mapget.FieldErrors{}
-    if c.Body.Customer == "" {
-        errs.Add("customer", "is required")
-    }
-    if len(errs) > 0 {
-        return errs
+    if c.Body.Start.After(c.Body.End) {
+        return mapget.FieldErrors{"end": {"must be after start"}}
     }
     return nil
 }
 ```
 
-`FieldErrors` becomes the same 400 as a binding failure. A `*mapget.Problem` is written as it is. Any other error is a 400 with its text.
+`FieldErrors` becomes the same 400 as a tag failure. A `*mapget.Problem` is written as it is. Any other error is a 400 with its text.
 
 ## Results and errors
 
@@ -286,7 +335,7 @@ GET   /openapi.json          -                 -
 app.Handle("GET /openapi.json", app.OpenAPI(mapget.Info{Title: "Orders", Version: "1.0.0"}))
 ```
 
-An OpenAPI 3.1 document from what is already written down: parameters from the tags, schemas from the Go types as `encoding/json` reads them, 201 and 204 from `Created` and `NoContent`, and a `default` problem details response on every operation. `summary` and `tags` on the `Route` field and `doc` on any field add the words:
+An OpenAPI 3.1 document from what is already written down: parameters from the tags, schemas from the Go types as `encoding/json` reads them, `minimum`, `pattern` and the other validation tags as schema keywords, 201 and 204 from `Created` and `NoContent`, and a `default` problem details response on every operation. `summary` and `tags` on the `Route` field and `doc` on any field add the words:
 
 ```go
 type ListOrders struct {
@@ -317,6 +366,21 @@ The tags are read once, at registration. A request costs a few `reflect` field s
 - Authentication. That is middleware.
 
 One more thing the fuzz test found that is the mux's and not mapget's: on Go 1.27 a path segment that is exactly `%2F` matches no `{wildcard}` and is answered with 404, though `a%2Fb` matches and gives `a/b`. `Path` returns an error for a path value of `"/"` for that reason.
+
+## Prior art
+
+Most of this exists already, and you should know that before picking it.
+
+[Huma](https://github.com/danielgtaylor/huma) is the established library for typed handlers and OpenAPI in Go. It has `path` and `query` struct tags, validation from tags, problem details and an OpenAPI 3.1 document, and it runs on the standard mux through an adapter as well as on chi, gin, echo and others. It is at v2 and has far more behind it than a library written in a week. If you want this for work, use Huma.
+
+mapget was written for fun and to learn, alongside [a post about routing for C# developers](https://stepinto.dev). Where it differs:
+
+- The route can live on the request type, as an attribute does in C#, and `Path` builds a link from a value of that same type.
+- A path value that fails its type or its rules is a 404, as a failed route constraint is in ASP.NET Core. Huma answers 422 (checked on v2.41.0).
+- Error bodies follow ASP.NET Core's `ValidationProblemDetails`: a 400 with `errors` keyed by field.
+- It only targets `http.ServeMux`, has no dependencies, and is small enough to read in a sitting.
+
+For matching the mux cannot express (regular expressions in the pattern, wildcards inside a segment), [chi](https://github.com/go-chi/chi) does both.
 
 ## Example
 

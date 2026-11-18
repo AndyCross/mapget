@@ -62,6 +62,8 @@ type field struct {
 	hasDef   bool
 	doc      string
 	codec    codec
+	rules    *rules    // validation tags, or nil
+	body     *bodyType // for a body field: the walk that checks it, or nil
 }
 
 // A plan is everything known about a request type before the first request.
@@ -246,6 +248,11 @@ func planFor(t reflect.Type) *plan {
 			if f.typ.Kind() == reflect.Pointer {
 				f.ptr, f.typ = true, f.typ.Elem()
 			}
+			bt, err := bodyTypeFor(f.typ)
+			if err != nil {
+				panic("mapget: " + err.Error())
+			}
+			f.body = bt
 			p.fields = append(p.fields, f)
 			continue
 		}
@@ -269,12 +276,23 @@ func planFor(t reflect.Type) *plan {
 			panic(fmt.Sprintf("%s: cannot read a %s from text; implement encoding.TextUnmarshaler", where, f.typ))
 		}
 		f.codec = c
+		r, err := parseRules(sf.Tag, f.typ, f.slice)
+		if err != nil {
+			panic(where + ": " + err.Error())
+		}
+		f.rules = r
 		if def, ok := sf.Tag.Lookup("default"); ok {
 			if f.src == fromPath || f.required {
 				panic(where + ": a default is never used on a path or required field")
 			}
-			if err := c.parse(def, reflect.New(f.typ).Elem()); err != nil {
+			dv := reflect.New(f.typ).Elem()
+			if err := c.parse(def, dv); err != nil {
 				panic(fmt.Sprintf("%s: default %q is not %s", where, def, c.want))
+			}
+			if r != nil {
+				if msg := r.check(dv); msg != "" {
+					panic(fmt.Sprintf("%s: default %q %s", where, def, msg))
+				}
 			}
 			f.def, f.hasDef = def, true
 		}
@@ -343,6 +361,9 @@ func (p *plan) bind(w http.ResponseWriter, r *http.Request, v reflect.Value, max
 			if err := f.codec.parse(r.PathValue(f.name), fv); err != nil {
 				return errNoMatch
 			}
+			if f.rules != nil && f.rules.check(fv) != "" {
+				return errNoMatch
+			}
 			continue
 		case fromQuery:
 			vals = query[f.name]
@@ -381,6 +402,9 @@ func (p *plan) bind(w http.ResponseWriter, r *http.Request, v reflect.Value, max
 			}
 			if ok {
 				fv.Set(s)
+				if f.rules != nil {
+					f.rules.apply(s, true, f.name, fail)
+				}
 			}
 		case f.ptr:
 			pv := reflect.New(f.typ)
@@ -389,10 +413,15 @@ func (p *plan) bind(w http.ResponseWriter, r *http.Request, v reflect.Value, max
 				continue
 			}
 			fv.Set(pv)
+			if f.rules != nil {
+				f.rules.apply(pv.Elem(), false, f.name, fail)
+			}
 		default:
 			if err := f.codec.parse(vals[0], fv); err != nil {
 				fv.SetZero()
 				fail(f.name, "must be "+f.codec.want)
+			} else if f.rules != nil {
+				f.rules.apply(fv, false, f.name, fail)
 			}
 		}
 	}
@@ -438,6 +467,7 @@ func (f *field) bindBody(w http.ResponseWriter, r *http.Request, fv reflect.Valu
 		if f.ptr {
 			fv.Set(target.Addr())
 		}
+		f.body.walk(target, "", fail)
 	case errors.Is(err, io.EOF):
 		if !f.ptr {
 			return BadRequest("a JSON request body is required")

@@ -8,7 +8,7 @@ Go 1.22 gave the standard mux methods and wildcards (`"GET /orders/{id}"`), whic
 go get github.com/AndyCross/mapget
 ```
 
-Go 1.22 or later.
+Go 1.23 or later. The patterns arrived in 1.22, but on 1.22 `Request.PathValue` panics when a `{rest...}` wildcard's value is exactly `*`, which this package's fuzz test found, and 1.23 fixed it.
 
 ## The route goes on the request type
 
@@ -207,7 +207,7 @@ The tags are read once, at registration. A request costs a few `reflect` field s
 - Form and multipart bodies, content negotiation, XML. Take a `*http.Request` field, or register a plain handler beside the typed ones.
 - Authentication. That is middleware.
 
-One thing found while testing that is the mux's and not mapget's: on Go 1.27 a path segment that is exactly `%2F` matches no `{wildcard}` and is answered with 404, though `a%2Fb` matches and gives `a/b`. `Path` returns an error for a path value of `"/"` for that reason.
+One more thing the fuzz test found that is the mux's and not mapget's: on Go 1.27 a path segment that is exactly `%2F` matches no `{wildcard}` and is answered with 404, though `a%2Fb` matches and gives `a/b`. `Path` returns an error for a path value of `"/"` for that reason.
 
 ## Example
 

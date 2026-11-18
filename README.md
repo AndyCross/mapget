@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/AndyCross/mapget/actions/workflows/ci.yml/badge.svg)](https://github.com/AndyCross/mapget/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/AndyCross/mapget.svg)](https://pkg.go.dev/github.com/AndyCross/mapget)
-[![Go Report Card](https://goreportcard.com/badge/github.com/AndyCross/mapget)](https://goreportcard.com/report/github.com/AndyCross/mapget)
+[![Go version](https://img.shields.io/github/go-mod/go-version/AndyCross/mapget)](go.mod)
 [![Release](https://img.shields.io/github/v/tag/AndyCross/mapget?label=release&sort=semver)](https://github.com/AndyCross/mapget/releases)
 ![Dependencies: 0](https://img.shields.io/badge/dependencies-0-brightgreen)
 ![Fuzzed in CI](https://img.shields.io/badge/fuzzed-in%20CI-blueviolet)
